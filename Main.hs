@@ -19,13 +19,13 @@ import Debug.Trace
 propertyReverseIsInverse :: Property
 propertyReverseIsInverse =
   property $ do
-    xs <- forAll $ Gen.list (Range.linear 0 100) Gen.alpha
+    xs <- forAll $ Gen.list (Range.linear 0 100) (Gen.enumBounded :: Gen Int)
     reverse (reverse xs) === xs
 
 propertySumIsLarger :: Property
 propertySumIsLarger =
   property $ do
-    x <- forAll $ (Gen.enumBounded :: Gen Int)
+    x <- forAll $ (Gen.enumBounded :: Gen Word32)
     y <- forAll $ Gen.enumBounded
     assert $ x + y >= x
 
@@ -43,30 +43,40 @@ mergeSort xs = merge (mergeSort firstHalf) (mergeSort secondHalf)
     | x < y = x:y:merge xs ys
     | otherwise = y:x:merge ys xs
 
-sortProperty :: Property
-sortProperty =
+mergeSortSorts :: Property
+mergeSortSorts =
   property $ do
-    xs <- forAll $ Gen.list (Range.linear 0 1000) (Gen.int $ Range.linear 0 1000 :: Gen Int)
+    xs <- fmap traceShowId $ forAll $ Gen.list (Range.linear 0 1000) (Gen.int $ Range.linear 0 1000 :: Gen Int)
     let
       sorted = mergeSort xs
     assert $ fst $ foldl (\(b, prev) this -> (b && prev <= this, this)) (True, minBound) sorted
 
+mergeSortDoesntRemoveElements :: Property
+mergeSortDoesntRemoveElements =
+  property $ do
+    xs <- forAll $ Gen.list (Range.linear 1 1000) (Gen.int $ Range.linear 0 1000 :: Gen Int)
+    x <- forAll $ Gen.element xs
+    let
+      sorted = mergeSort xs
+    assert $ elem x sorted
+
+mergeSortDoesntAddElements :: Property
+mergeSortDoesntAddElements =
+  property $ do
+    xs <- forAll $ Gen.list (Range.linear 1 1000) (Gen.int $ Range.linear 0 1000 :: Gen Int)
+    let
+      sorted = mergeSort xs
+    x <- forAll $ Gen.element sorted
+    assert $ elem x xs
+
 main = do
-  putStrLn "Hello devsoc"
+  putStrLn "Hello devsoc!!"
   --check propertyReverseIsInverse
   --check propertySumIsLarger
-  --check sortProperty
+  --check mergeSortSorts
+  --check mergeSortDoesntRemoveElements
+  --check mergeSortDoesntAddElements
   --check depositIncreasesBankBalance
   --check transferDoesntChangeTheBalance
   --check transferReducesTheBalance
-  check operationsNotInvolvingCustomerDoNotChangeHisBalance
---
---main = do
---  putStrLn "Hello devsoc!!"
---  quickCheck property1
---  quickCheck (withMaxSuccess 1000 property2)
---  quickCheck transferDoesntChangeTheBalance
---  quickCheck depositIncreasesBankBalance
---  quickCheck alwaysHaveMoney
---  --quickCheck (withMaxSuccess 10000 operationsNotInvolvingCustomerDoNotChangeHisBalance)
---  --quickCheck (withMaxSuccess 10000 sortProperty)
+  --check operationsNotInvolvingCustomerDoNotChangeHisBalance

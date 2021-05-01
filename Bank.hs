@@ -65,38 +65,6 @@ bankWithMoreThan1Customer = do
   money <- randomMoney
   operate (AddCustomer money) <$> nonEmptyBank
 
-depositIncreasesBankBalance :: Property
-depositIncreasesBankBalance =
-  property $ do
-    bank <- forAll nonEmptyBank
-    cust <- forAll $ Gen.element (customers bank)
-    amtToDeposit <- forAll $ Gen.word (Range.linear 1 5000000)
-    let
-      newBank = operate (Deposit cust amtToDeposit) bank
-    assert $ bank ! cust < newBank ! cust
-
-transferDoesntChangeTheBalance :: Property
-transferDoesntChangeTheBalance =
-  property $ do
-    bank <- forAll nonEmptyBank
-    fromCust <- forAll $ Gen.element (customers bank)
-    toCust <- forAll $ Gen.element (customers bank)
-    amtToTransfer <- forAll $ Gen.word (Range.linear 0 (bank ! fromCust))
-    let
-      newBank = operate (Transfer fromCust toCust amtToTransfer) bank
-    totalBalance bank === totalBalance newBank
-
-transferReducesTheBalance :: Property
-transferReducesTheBalance =
-  property $ do
-    bank <- forAll nonEmptyBank
-    fromCust <- forAll $ Gen.element (customers bank)
-    toCust <- forAll $ Gen.element (customers bank)
-    amtToTransfer <- forAll $ Gen.word (Range.linear 0 (bank ! fromCust))
-    let
-      newBank = operate (Transfer fromCust toCust amtToTransfer) bank
-    assert $ newBank ! fromCust < bank ! fromCust
-
 genOperations :: Bank -> Gen BankOperation
 genOperations bank =
   Gen.choice
@@ -107,7 +75,7 @@ genOperations bank =
     , genRemoveCustomer ]
   where
   cust = Gen.element (customers bank)
-  amt = Gen.word (Range.linearBounded)
+  amt = randomMoney
   genWithdrawal = Withdraw <$> cust <*> amt
   genDeposit = Deposit <$> cust <*> amt
   genTransfer = Transfer <$> cust <*> cust <*> amt
@@ -117,6 +85,38 @@ genOperations bank =
 operationsNotInvolvingCustomer :: CustomerId -> Bank -> Gen BankOperation
 operationsNotInvolvingCustomer custId bank =
   genOperations (Map.delete custId bank)
+
+depositIncreasesBankBalance :: Property
+depositIncreasesBankBalance =
+  property $ do
+    bank <- forAll nonEmptyBank
+    cust <- forAll $ Gen.element (customers bank)
+    amtToDeposit <- forAll randomMoney
+    let
+      newBank = operate (Deposit cust amtToDeposit) bank
+    assert $ bank ! cust < newBank ! cust
+
+transferDoesntChangeTheBalance :: Property
+transferDoesntChangeTheBalance =
+  property $ do
+    bank <- forAll nonEmptyBank
+    fromCust <- forAll $ Gen.element (customers bank)
+    toCust <- forAll $ Gen.element (customers bank)
+    amtToTransfer <- forAll randomMoney
+    let
+      newBank = operate (Transfer fromCust toCust amtToTransfer) bank
+    totalBalance bank === totalBalance newBank
+
+transferReducesTheBalance :: Property
+transferReducesTheBalance =
+  property $ do
+    bank <- forAll nonEmptyBank
+    fromCust <- forAll $ Gen.element (customers bank)
+    toCust <- forAll $ Gen.element (customers bank)
+    amtToTransfer <- forAll randomMoney
+    let
+      newBank = operate (Transfer fromCust toCust amtToTransfer) bank
+    assert $ newBank ! fromCust < bank ! fromCust
 
 operationsNotInvolvingCustomerDoNotChangeHisBalance :: Property
 operationsNotInvolvingCustomerDoNotChangeHisBalance =
@@ -129,17 +129,3 @@ operationsNotInvolvingCustomerDoNotChangeHisBalance =
       custBalanceAfterOperations =
         Map.lookup cust $ foldl (\b op -> operate op b) bank operations
     custBalancePreOperations === custBalanceAfterOperations
-
---
---alwaysHaveMoney :: Property
---alwaysHaveMoney =
---  forAll arbitraryBankOperations $
---    (\(bank, operations, balance) -> balance >= 0)
---  where
---  arbitraryBankOperations = do
---    bank <- nonEmptyBank
---    operations <- listOf arbitrary
---    let
---      bankAfterOps = foldl (\b op -> operate op b) bank operations
---    return (bank, operations, totalBalance bankAfterOps)
---
